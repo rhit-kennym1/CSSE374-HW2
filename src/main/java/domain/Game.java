@@ -11,6 +11,7 @@ public class Game {
     private final GameSaver saver;
     private final List<ChipColor> currentTurnChips;
     private String lastError;
+    private boolean gameOver = false;
 
     public Game(Board board, List<Player> players, GameSaver saver) {
         this.board = board;
@@ -27,6 +28,9 @@ public class Game {
     }
 
     public void buyCard(int cardId) throws IllegalMoveException {
+        if (gameOver) {
+            throw new IllegalMoveException("Game is over. No more moves allowed.");
+        }
         if (!currentTurnChips.isEmpty()) {
             throw new IllegalMoveException("Cannot buy card after taking chips this turn");
         }
@@ -44,8 +48,18 @@ public class Game {
         currentPlayer.addVictoryPoints(card.getVictoryPoints());
 
         moves.add(new PlayerMove(MoveType.BUY_CARD, cardId, new ArrayList<>()));
-        nextPlayer();
+
+        checkEndGame();
+
+        if (!board.getCards().isEmpty()) {
+            nextPlayer();
+        }
         save();
+
+        if (gameOver) {
+            throw new IllegalMoveException(lastError);
+        }
+
         lastError = null;
     }
 
@@ -94,6 +108,10 @@ public class Game {
     }
 
     public void takeChipIncremental(ChipColor color) throws IllegalMoveException {
+        checkEndGame();
+        if (gameOver) {
+            throw new IllegalMoveException("Game is over. No more moves allowed.");
+        }
         if (currentTurnChips.isEmpty()) {
             Player currentPlayer = players.get(currentPlayerIndex);
             currentPlayer.takeChip(color, 1);
@@ -180,6 +198,29 @@ public class Game {
                 p2.getVictoryPoints(),
                 lastError,
                 new ArrayList<>(currentTurnChips));
+    }
+
+    private void checkEndGame() {
+        if (board.getCards().isEmpty()) {
+            gameOver = true;
+
+            Player p1 = players.get(0);
+            Player p2 = players.get(1);
+
+            if (p1.getVictoryPoints() > p2.getVictoryPoints()) {
+                lastError = "End Game: Player 1 wins (" +
+                        p1.getVictoryPoints() + " vs " +
+                        p2.getVictoryPoints() + ")";
+            } else if (p2.getVictoryPoints() > p1.getVictoryPoints()) {
+                lastError = "End Game: Player 2 wins (" +
+                        p2.getVictoryPoints() + " vs " +
+                        p1.getVictoryPoints() + ")";
+            } else {
+                lastError = "End Game: Draw (" +
+                        p1.getVictoryPoints() + " vs " +
+                        p2.getVictoryPoints() + ")";
+            }
+        }
     }
 
     public void setLastError(String error) {
